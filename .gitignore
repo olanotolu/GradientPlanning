@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Data and checkpoints (keep structure, ignore large files)
+data/*.npz
+checkpoints/
+checkpoints_v2/
+results/*.png
+results/*.jpg
+results/*.txt
+*.pt
+*.pth
+
+# Keep demo plots for README
+!results/demo_*.png
+
+# Large files
+*.pdf
+*.zip
+*.tar.gz
+
+# Keep the paper PDF for reference (but it's large, so consider excluding)
+# Uncomment next line if you want to exclude the PDF:
+# 2512.09929v1.pdf
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+*~
+

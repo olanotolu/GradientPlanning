@@ -41,12 +41,13 @@ def plan(
     device = next(world_model.parameters()).device
     
     # Ensure tensors are on correct device and have batch dimension
+    # Also ensure they require gradients (needed for backprop through model)
     if z0.dim() == 1:
-        z0 = z0.unsqueeze(0).to(device)
+        z0 = z0.unsqueeze(0).to(device).requires_grad_(True)
         z_goal = z_goal.unsqueeze(0).to(device)
         squeeze_output = True
     else:
-        z0 = z0.to(device)
+        z0 = z0.to(device).requires_grad_(True)
         z_goal = z_goal.to(device)
         squeeze_output = False
     

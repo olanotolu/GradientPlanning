@@ -7,6 +7,7 @@ Predicts next state given current state and action.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Optional
 
 
 class WorldModel(nn.Module):
