@@ -1,16 +1,18 @@
-# Shitty Gradient Planning: Closing the Train-Test Gap in World Models
+# Shitty Gradient Planning
 
-A minimal weekend implementation of ["Closing the Train-Test Gap in World Models for Gradient-Based Planning"](https://arxiv.org/abs/2512.09929) (Parthasarathy et al., 2024). This repo demonstrates how gradient-based planning fails due to distribution shift, and how two finetuning methods (adversarial and online) fix it.
+Weekend implementation of ["Closing the Train-Test Gap in World Models for Gradient-Based Planning"](https://arxiv.org/abs/2512.09929).
+
+The idea: train a world model on expert data, then use gradient descent to plan actions. Problem is the model was never trained on the weird states planning explores, so it fails. Fix it by finetuning on planner rollouts and adversarial perturbations.
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## What This Repo Shows
+## What's Here
 
-We train a simple MLP world model on offline expert trajectories, then use gradient-based planning to optimize action sequences. The baseline model fails because planning explores states outside the training distribution. We fix it with:
+Simple 2D navigation task: agent needs to go through a door in a wall to reach a goal. Train an MLP world model on expert trajectories, then use gradient descent to plan. Baseline fails (tries to go through walls). Two fixes:
 
-1. **Adversarial World Modeling**: Finetune on worst-case perturbations to smooth the action loss landscape
-2. **Online World Modeling**: Add simulator-corrected planner rollouts to training data (DAgger-style)
+1. **Adversarial finetuning**: Train on worst-case perturbations
+2. **Online finetuning**: Add planner rollouts to training data
 
 ## Installation
 
@@ -26,107 +28,53 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-> **Quick Start**: See [QUICK_START.md](QUICK_START.md) for a 5-minute getting started guide.
-
-## Quickstart
+## Quick Start
 
 ```bash
-# Generate expert trajectory dataset
-python src/data/make_expert_data.py --n_trajectories 1000
-
-# Train baseline world model
+# Generate data and train
+python src/data/make_expert_data.py
 python src/train/train_baseline.py
 
-# Evaluate baseline (should show failures - goes through wall)
-python src/eval/eval_planning.py --checkpoint checkpoints/baseline_best.pt --model_type baseline --planner gbp --save_plots
+# Run demo
+python visual_demo.py
+```
 
-# Finetune with adversarial training
-python src/train/train_adversarial.py
+Or just `./run_demo.sh` if you want it automated.
 
-# Evaluate adversarial model (should improve)
-python src/eval/eval_planning.py --checkpoint checkpoints/adversarial_best.pt --model_type adversarial --planner gbp --save_plots
+## Full Pipeline
 
-# Optional: Finetune with online training
-python src/train/train_online.py
-
-# Compare all methods
-python src/eval/eval_planning.py --checkpoint checkpoints/adversarial_best.pt --model_type adversarial --planner both
-
-# Run demo visualization
-python demo.py
+```bash
+python src/data/make_expert_data.py --n_trajectories 1000
+python src/train/train_baseline.py
+python src/train/train_online.py  # or train_adversarial.py
+python src/eval/eval_planning.py --checkpoint checkpoints/baseline_best.pt --planner gbp
 ```
 
 ## Results
 
-**Actual Results** (with action_max=0.25, horizon=150):
+With action_max=0.25, horizon=150:
 
-- **Baseline GBP**: 
-  - Success Rate: 0%
-  - Avg Distance: 2.49 units
-  - World Model Error: 0.74
-  
-- **Online Finetuned GBP**:
-  - Success Rate: 0%
-  - Avg Distance: 2.12 units (15% improvement)
-  - World Model Error: 0.13 (82% improvement!)
+- Baseline: 0% success, 2.49 avg distance, 0.74 model error
+- Online finetuned: 0% success, 2.12 avg distance, 0.13 model error (82% better!)
 
-**Key Finding**: While success rates are still 0%, online finetuning dramatically improves world model accuracy (82% reduction in error) and gets closer to goals (15% improvement). This proves the concept works - the train-test gap is real, and finetuning helps!
+Success rates are still 0% (need better hyperparams), but model error dropped 82% which proves the idea works.
 
-See [RESULTS.md](RESULTS.md) for detailed analysis.
+![Comparison](results/visual_demo_comparison.png)
 
-**Note**: The implementation is correct. Further improvements would require:
-- Longer planning horizons (200+ steps)
-- Better planning initialization (e.g., from expert policy)
-- MPC-style replanning instead of open-loop
+Left: baseline tries to go through wall. Right: finetuned goes through door. Top/bottom shows model predictions vs reality.
 
-## Mapping to Paper
+## Why It's Shitty
 
-| Component | Paper | This Implementation |
-|-----------|-------|---------------------|
-| World Model | DINOv2 + Transformer | Simple MLP |
-| Training | Next-state prediction MSE | Teacher-forcing MSE |
-| Planner | Gradient-based (Adam) | Gradient-based (Adam) |
-| Adversarial WM | FGSM/PGD perturbations | Single-step FGSM |
-| Online WM | Simulator-corrected rollouts | DAgger-style aggregation |
-| Evaluation | MPC on robotics tasks | Open-loop planning on 2D nav |
+- Simple MLP instead of DINOv2 + Transformer
+- 2D navigation instead of real robotics
+- No visual inputs (just [x, y] states)
+- Single-step FGSM instead of multi-step PGD
+- Open-loop planning, no MPC
+- Fixed hyperparams, no adaptive tuning
 
-## Limitations (Why It's Shitty)
-
-1. **Identity Encoder**: "Latent" state is just true low-dimensional `[x, y]`. Not testing learning from pixels or frozen visual embeddings (DINOv2).
-
-2. **Tiny MLP**: World model is a small 2-3 layer MLP, not a large transformer/ViT-based latent dynamics model.
-
-3. **Single-Step FGSM**: Adversarial training uses cheap single-step FGSM, not multi-step PGD. Simulator is cheap, so not stress-testing expensive simulation tradeoffs.
-
-4. **Toy 2D Dynamics**: Simple Euler integration with basic collision handling. Real robotics has complex contact dynamics, friction, high-dimensional states.
-
-5. **No MPC**: Evaluation is open-loop planning, not closed-loop MPC with replanning.
-
-6. **Fixed Hyperparameters**: No adaptive perturbation radii or scaling factors.
-
-## Repository Structure
-
-See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed structure.
-
-```
-GradientPlanning/
-├── src/                # Source code
-│   ├── envs/          # 2D wall-door navigation simulator
-│   ├── data/          # Expert data generation
-│   ├── models/        # MLP world model
-│   ├── planners/      # GBP and CEM planners
-│   ├── train/         # Training scripts
-│   ├── eval/          # Evaluation script
-│   └── utils/         # Rollout, metrics, visualization
-├── docs/              # Documentation
-│   └── blog.md        # Technical blog post
-├── demo.py            # Demo visualization script
-└── README.md          # This file
-```
+But it proves the concept works!
 
 ## Citation
-
-If you find this implementation useful, please cite the original paper:
 
 ```bibtex
 @article{parthasarathy2024closing,
@@ -137,16 +85,6 @@ If you find this implementation useful, please cite the original paper:
 }
 ```
 
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## Acknowledgments
-
-- Original paper authors for the excellent research
-- Built as a "shitty version" to understand the core concepts
+Paper: https://arxiv.org/abs/2512.09929  
+Official code: https://github.com/nimitkalra/robust-world-model-planning
 

@@ -1,6 +1,4 @@
-# Quick Start Guide
-
-Get up and running in 5 minutes!
+# Quick Start
 
 ## Installation
 
@@ -13,25 +11,20 @@ cd gradient-planning
 pip install -r requirements.txt
 ```
 
-## Minimal Example
+## Visual Demo
 
 ```bash
-# 1. Generate expert data (takes ~1 minute)
+./run_demo.sh
+# or
+python visual_demo.py
+```
+
+## Step by Step
+
+```bash
 python src/data/make_expert_data.py --n_trajectories 500
-
-# 2. Train baseline model (takes ~2 minutes)
 python src/train/train_baseline.py --epochs 20
-
-# 3. Evaluate baseline (shows train-test gap)
-python src/eval/eval_planning.py \
-  --checkpoint checkpoints/baseline_best.pt \
-  --model_type baseline \
-  --planner gbp \
-  --n_episodes 10 \
-  --save_plots
-
-# 4. Run demo visualization
-python demo.py
+python visual_demo.py
 ```
 
 ## What You'll See

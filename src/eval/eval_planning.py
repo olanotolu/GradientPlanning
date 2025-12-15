@@ -1,7 +1,7 @@
 """
-Evaluation script for comparing planning methods.
+Evaluation script - compare planning methods.
 
-Evaluates success rate, world model error, and planning time.
+Measures success rate, world model error, and planning time.
 """
 
 import torch

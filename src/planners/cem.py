@@ -1,7 +1,7 @@
 """
-Cross-Entropy Method (CEM) Baseline Planner
+CEM planner - gradient-free baseline using sampling.
 
-Gradient-free planning using iterative sampling and elite selection.
+Used as comparison for gradient-based planning.
 """
 
 import torch

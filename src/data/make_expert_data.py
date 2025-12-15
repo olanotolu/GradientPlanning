@@ -1,9 +1,7 @@
 """
-Generate offline expert trajectories for training world model.
+Generate expert trajectories for training.
 
-Expert policy: Two-waypoint controller
-1. Navigate to door center (0, 0)
-2. Navigate from door to goal
+Simple two-waypoint controller: go to door center, then to goal.
 """
 
 import numpy as np

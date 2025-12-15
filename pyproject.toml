@@ -1,7 +1,7 @@
 [project]
 name = "gradient-planning"
 version = "0.1.0"
-description = "Minimal implementation of gradient-based planning with world models"
+description = "Minimal implementation of 'Closing the Train-Test Gap in World Models for Gradient-Based Planning' (Parthasarathy et al., 2024, arXiv:2512.09929)"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}

@@ -1,7 +1,7 @@
 """
-Baseline Training: Standard teacher-forcing MSE on expert data.
+Baseline training - standard MSE on expert data.
 
-This is the basic training that creates the train-test gap.
+This creates the train-test gap: model works on expert data but fails during planning.
 """
 
 import torch

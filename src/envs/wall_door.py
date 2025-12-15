@@ -1,8 +1,8 @@
 """
-2D Wall-Door Navigation Environment
+2D wall-door navigation environment.
 
-Simple 2D navigation task with a wall at x=0 and a door segment.
-Agent must navigate from start to goal, going through the door.
+Wall at x=0 with door opening. Agent needs to go through door to reach goal.
+Simple toy version of the paper's robotics tasks.
 """
 
 import numpy as np

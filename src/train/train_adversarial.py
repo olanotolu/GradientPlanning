@@ -1,7 +1,7 @@
 """
-Adversarial World Modeling: Finetune on worst-case perturbations.
+Adversarial world modeling - finetune on worst-case perturbations.
 
-Uses FGSM-style single-step adversarial training to smooth the action loss landscape.
+Uses FGSM (single-step) to smooth the action loss landscape.
 """
 
 import torch

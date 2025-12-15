@@ -1,5 +1,7 @@
 # Closing the Train-Test Gap: A Weekend Implementation
 
+Paper: https://arxiv.org/abs/2512.09929
+
 ## The Problem: Gradient Planning Exploits Model Errors
 
 World models are trained to predict the next state given the current state and action. At test time, we use them for planning: optimize a sequence of actions to reach a goal by backpropagating through the world model.

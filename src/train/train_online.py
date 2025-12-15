@@ -1,7 +1,7 @@
 """
-Online World Modeling: Finetune on simulator-corrected planner rollouts.
+Online world modeling - finetune on planner rollouts corrected by simulator.
 
-DAgger-style algorithm that adds planner-generated trajectories to training data.
+DAgger-style: add planner trajectories to training data.
 """
 
 import torch

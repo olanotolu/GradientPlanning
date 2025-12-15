@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
-Demo script: Visualize the train-test gap and how finetuning fixes it.
-
-Shows baseline vs online finetuned planning trajectories.
+Demo - visualize baseline vs finetuned planning.
 """
 
 import torch
