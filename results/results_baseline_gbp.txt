@@ -1,0 +1,10 @@
+Model: baseline
+Checkpoint: checkpoints_v2/baseline_best.pt
+Episodes: 30
+
+GBP Planner:
+  Success Rate: 0.00%
+  Avg Distance: 2.4871
+  Avg Planning Time: 6.6731s
+  Avg World Model Error: 0.736825
+

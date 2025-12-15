@@ -36,16 +36,8 @@ ENV/
 
 # Data and checkpoints (keep structure, ignore large files)
 data/*.npz
-checkpoints/
-checkpoints_v2/
-results/*.png
-results/*.jpg
-results/*.txt
-*.pt
-*.pth
-
-# Keep demo plots for README
-!results/demo_*.png
+checkpoints/*.pt
+checkpoints_v2/*.pt
 
 # Large files
 *.pdf

@@ -12,6 +12,7 @@ import argparse
 from pathlib import Path
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -20,6 +21,7 @@ from src.data import ExpertDataset
 from src.planners.gbp import plan as gbp_plan
 from src.envs.wall_door import WallDoorEnv
 from src.utils.rollout import rollout_sim
+from src.utils.metrics import planning_success
 
 
 class ReplayBuffer:
@@ -79,6 +81,84 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
         n_batches += 1
     
     return total_loss / n_batches if n_batches > 0 else 0.0
+
+
+def evaluate_success_rate(model, env, device, n_episodes=20, horizon=200, gbp_steps=300, seed=42):
+    """
+    Evaluate success rate of current model on test episodes.
+    
+    Args:
+        model: World model to evaluate
+        env: Environment
+        device: Device
+        n_episodes: Number of test episodes
+        horizon: Planning horizon
+        gbp_steps: GBP optimization steps
+        seed: Random seed
+        
+    Returns:
+        Success rate (0-1)
+    """
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    
+    successes = 0
+    
+    for episode in range(n_episodes):
+        # Sample random start and goal on opposite sides of wall
+        if np.random.rand() > 0.5:
+            start = np.array([
+                np.random.uniform(env.bounds[0], -0.5),
+                np.random.uniform(env.bounds[2], env.bounds[3])
+            ], dtype=np.float32)
+            goal = np.array([
+                np.random.uniform(0.5, env.bounds[1]),
+                np.random.uniform(env.bounds[2], env.bounds[3])
+            ], dtype=np.float32)
+        else:
+            start = np.array([
+                np.random.uniform(0.5, env.bounds[1]),
+                np.random.uniform(env.bounds[2], env.bounds[3])
+            ], dtype=np.float32)
+            goal = np.array([
+                np.random.uniform(env.bounds[0], -0.5),
+                np.random.uniform(env.bounds[2], env.bounds[3])
+            ], dtype=np.float32)
+        
+        z0 = torch.from_numpy(start).float().to(device)
+        z_goal = torch.from_numpy(goal).float().to(device)
+        
+        # Plan
+        model.train()
+        for param in model.parameters():
+            param.requires_grad = True
+        
+        try:
+            actions = gbp_plan(
+                model, z0, z_goal, horizon=horizon,
+                n_steps=gbp_steps, action_max=env.action_max,
+                intermediate_weight=0.1
+            )
+        except:
+            # If planning fails, count as failure
+            model.eval()
+            for param in model.parameters():
+                param.requires_grad = False
+            continue
+        
+        model.eval()
+        for param in model.parameters():
+            param.requires_grad = False
+        
+        # Rollout in simulator
+        actions = actions.cpu().numpy()
+        states = rollout_sim(env, start, actions, horizon=horizon)
+        
+        # Check success
+        if planning_success(states[-1], goal, env.goal_threshold):
+            successes += 1
+    
+    return successes / n_episodes
 
 
 def main():
@@ -141,6 +221,9 @@ def main():
     # Loss and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    
+    # Track success rates over iterations
+    success_rates = []
     
     print("\nStarting online finetuning (DAgger-style)...")
     
@@ -252,6 +335,15 @@ def main():
         else:
             print("No planner data yet, skipping finetuning")
         
+        # Evaluate success rate
+        print("Evaluating success rate...")
+        success_rate = evaluate_success_rate(
+            model, env, device, n_episodes=20, horizon=args.horizon,
+            gbp_steps=args.gbp_steps, seed=args.seed + iteration
+        )
+        success_rates.append(success_rate)
+        print(f"Success rate: {success_rate*100:.1f}%")
+        
         # Save checkpoint
         checkpoint_path = output_dir / f"online_iter_{iteration + 1}.pt"
         torch.save({
@@ -259,6 +351,7 @@ def main():
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'replay_buffer_size': len(replay_buffer),
+            'success_rate': success_rate,
             'state_dim': checkpoint['state_dim'],
             'action_dim': checkpoint['action_dim'],
             'hidden_dim': checkpoint['hidden_dim'],
@@ -283,6 +376,24 @@ def main():
     print(f"\nOnline finetuning complete!")
     print(f"Final replay buffer size: {len(replay_buffer)}")
     print(f"Models saved to {output_dir}")
+    
+    # Create success rate plot
+    if len(success_rates) > 0:
+        plt.figure(figsize=(8, 6))
+        iterations = range(1, len(success_rates) + 1)
+        plt.plot(iterations, [sr * 100 for sr in success_rates], 'o-', linewidth=2, markersize=8)
+        plt.xlabel('Iteration', fontsize=12)
+        plt.ylabel('Success Rate (%)', fontsize=12)
+        plt.title('Success Rate Over Online Finetuning Iterations', fontsize=14)
+        plt.grid(True, alpha=0.3)
+        plt.ylim([0, max(35, max(sr * 100 for sr in success_rates) * 1.2)])
+        
+        # Save plot
+        plot_path = Path("results") / "online_training_success_rate.png"
+        plot_path.parent.mkdir(exist_ok=True)
+        plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+        print(f"Success rate plot saved to {plot_path}")
+        plt.close()
 
 
 if __name__ == "__main__":

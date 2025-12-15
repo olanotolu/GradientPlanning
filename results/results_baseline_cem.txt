@@ -1,0 +1,10 @@
+Model: baseline
+Checkpoint: checkpoints_v2/baseline_best.pt
+Episodes: 20
+
+CEM Planner:
+  Success Rate: 0.00%
+  Avg Distance: 1.9266
+  Avg Planning Time: 2.4507s
+  Avg World Model Error: 0.630994
+

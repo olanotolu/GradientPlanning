@@ -1,0 +1,10 @@
+Model: online
+Checkpoint: checkpoints_v2/online_final.pt
+Episodes: 50
+
+GBP Planner:
+  Success Rate: 0.00%
+  Avg Distance: 2.1593
+  Avg Planning Time: 9.1422s
+  Avg World Model Error: 0.175443
+
