@@ -52,9 +52,9 @@ results/*.txt
 *.zip
 *.tar.gz
 
-# Keep the paper PDF for reference (but it's large, so consider excluding)
-# Uncomment next line if you want to exclude the PDF:
-# 2512.09929v1.pdf
+# Paper PDF (large - 6.5MB, exclude by default)
+# Uncomment to include: # 2512.09929v1.pdf
+2512.09929v1.pdf
 
 # Jupyter
 .ipynb_checkpoints/

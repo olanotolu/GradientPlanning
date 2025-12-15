@@ -26,6 +26,8 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+> **Quick Start**: See [QUICK_START.md](QUICK_START.md) for a 5-minute getting started guide.
+
 ## Quickstart
 
 ```bash
