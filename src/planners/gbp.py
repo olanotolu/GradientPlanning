@@ -28,15 +28,28 @@ def plan(
     """
     device = next(world_model.parameters()).device
     
+    # Auto-encode images if model has encoder
+    if hasattr(world_model, 'encoder') and world_model.encoder is not None:
+        # Check if z0 looks like an image (C, H, W) or (B, C, H, W)
+        # Latent dim is usually 1D. Image is 3D.
+        if z0.dim() >= 3:
+            with torch.no_grad():
+                z0 = world_model.encode(z0.to(device))
+                z_goal = world_model.encode(z_goal.to(device))
+    
     # Handle batch dimension and device
     if z0.dim() == 1:
-        z0 = z0.unsqueeze(0).to(device).requires_grad_(True)
+        z0 = z0.unsqueeze(0).to(device)
         z_goal = z_goal.unsqueeze(0).to(device)
         squeeze_output = True
     else:
-        z0 = z0.to(device).requires_grad_(True)
+        z0 = z0.to(device)
         z_goal = z_goal.to(device)
         squeeze_output = False
+    
+    # z0 doesn't need grad for action optimization
+    # z0.requires_grad_(True) 
+
     
     action_dim = 2
     

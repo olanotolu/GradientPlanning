@@ -15,7 +15,9 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.models.world_model import WorldModel
+from src.models.encoders import DINOv2Encoder
 from src.data import ExpertDataset
+from src.utils.device import get_device, set_seed
 
 
 def train_epoch(model, dataloader, optimizer, criterion, device):
@@ -31,6 +33,12 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
         
         optimizer.zero_grad()
         
+        # Encode images if using encoder
+        if model.encoder is not None:
+            with torch.no_grad():
+                z = model.encode(z)
+                z_next = model.encode(z_next)
+        
         # Forward pass
         z_next_pred = model(z, a)
         
@@ -44,7 +52,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
         total_loss += loss.item()
         n_batches += 1
     
-    return total_loss / n_batches
+    return total_loss / n_batches if n_batches > 0 else 0.0
 
 
 def validate(model, dataloader, criterion, device):
@@ -59,13 +67,18 @@ def validate(model, dataloader, criterion, device):
             a = a.to(device)
             z_next = z_next.to(device)
             
+            # Encode images if using encoder
+            if model.encoder is not None:
+                z = model.encode(z)
+                z_next = model.encode(z_next)
+            
             z_next_pred = model(z, a)
             loss = criterion(z_next_pred, z_next)
             
             total_loss += loss.item()
             n_batches += 1
     
-    return total_loss / n_batches
+    return total_loss / n_batches if n_batches > 0 else 0.0
 
 
 def main():
@@ -80,21 +93,33 @@ def main():
     parser.add_argument("--use_residual", action="store_true", help="Use residual connection")
     parser.add_argument("--val_split", type=float, default=0.1, help="Validation split")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--use_images", action="store_true", help="Use images instead of states")
+    parser.add_argument("--image_model_size", type=str, default="small", help="DINOv2 model size")
     
     args = parser.parse_args()
     
     # Set random seed
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
+    set_seed(args.seed)
     
-    # Device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Device (supports CUDA, MPS for Apple Silicon, or CPU)
+    device = get_device()
     print(f"Using device: {device}")
+    
+    # Initialize encoder if using images
+    encoder = None
+    if args.use_images:
+        print(f"Initializing DINOv2 {args.image_model_size} encoder...")
+        encoder = DINOv2Encoder(model_size=args.image_model_size, device=str(device))
+        print(f"Encoder output dim: {encoder.output_dim}")
     
     # Load dataset
     print(f"Loading dataset from {args.data_path}...")
-    full_dataset = ExpertDataset(args.data_path)
+    try:
+        full_dataset = ExpertDataset(args.data_path, use_images=args.use_images)
+    except ValueError as e:
+        print(f"Error loading dataset: {e}")
+        print("Did you generate data with --save_images?")
+        return
     
     # Split train/val
     n_total = len(full_dataset)
@@ -109,10 +134,18 @@ def main():
     
     print(f"Train samples: {n_train}, Val samples: {n_val}")
     
-    # Get state/action dimensions from first sample
-    z_sample, a_sample, _ = full_dataset[0]
-    state_dim = z_sample.shape[0]
+    # Get state/action dimensions
+    if args.use_images:
+        state_dim = encoder.output_dim
+    else:
+        z_sample, a_sample, _ = full_dataset[0]
+        state_dim = z_sample.shape[0]
+        
+    # Get action dim from dataset (assumes consistent action dim)
+    _, a_sample, _ = full_dataset[0]
     action_dim = a_sample.shape[0]
+    
+    print(f"State dim (latent): {state_dim}, Action dim: {action_dim}")
     
     # Create model
     model = WorldModel(
@@ -121,7 +154,9 @@ def main():
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
         use_residual=args.use_residual,
+        encoder=encoder,
     ).to(device)
+
     
     print(f"Model: {sum(p.numel() for p in model.parameters())} parameters")
     

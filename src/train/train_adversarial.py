@@ -15,9 +15,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.models.world_model import WorldModel
-from src.data import ExpertDataset
-
+from src.models.transformer_world_model import TransformerWorldModel
+from src.data import SequenceDataset
+from src.utils.device import get_device, set_seed
 
 def train_epoch_adversarial(
     model,
@@ -33,18 +33,6 @@ def train_epoch_adversarial(
 ):
     """
     Train for one epoch with adversarial perturbations.
-    
-    Args:
-        model: World model
-        dataloader: Data loader
-        optimizer: Optimizer
-        criterion: Loss function
-        device: Device
-        eps_z: Perturbation radius for states
-        eps_a: Perturbation radius for actions
-        alpha: Step size for perturbation update (defaults to eps)
-        lambda_z: Scaling factor for state perturbations
-        lambda_a: Scaling factor for action perturbations
     """
     model.train()
     total_loss = 0.0
@@ -53,60 +41,77 @@ def train_epoch_adversarial(
     if alpha is None:
         alpha = max(eps_z, eps_a)
     
-    for z, a, z_next in dataloader:
-        z = z.to(device)
-        a = a.to(device)
-        z_next = z_next.to(device)
-        
-        # Initialize perturbations uniformly in [-eps, eps]
-        delta_z = torch.empty_like(z).uniform_(-eps_z, eps_z)
-        delta_a = torch.empty_like(a).uniform_(-eps_a, eps_a)
-        
-        delta_z.requires_grad_(True)
-        delta_a.requires_grad_(True)
-        
-        # Compute loss on perturbed inputs
-        z_pert = z + delta_z
-        a_pert = a + delta_a
-        z_next_pred = model(z_pert, a_pert)
-        loss_pert = criterion(z_next_pred, z_next)
-        
-        # Compute gradients w.r.t. perturbations
-        grad_z = torch.autograd.grad(loss_pert, delta_z, create_graph=True)[0]
-        grad_a = torch.autograd.grad(loss_pert, delta_a, create_graph=True)[0]
-        
-        # Update perturbations: FGSM-style (single step with sign)
-        delta_z = delta_z + alpha * torch.sign(grad_z)
-        delta_a = delta_a + alpha * torch.sign(grad_a)
-        
-        # Clip perturbations to bounds
-        delta_z = torch.clamp(delta_z, -eps_z, eps_z)
-        delta_a = torch.clamp(delta_a, -eps_a, eps_a)
-        
-        # Detach for final forward pass (don't backprop through perturbation update)
-        delta_z = delta_z.detach()
-        delta_a = delta_a.detach()
-        
-        # Final forward pass on perturbed inputs
-        optimizer.zero_grad()
-        z_pert = z + delta_z
-        a_pert = a + delta_a
-        z_next_pred = model(z_pert, a_pert)
-        
-        # Loss with scaling factors
-        loss = criterion(z_next_pred, z_next)
-        if lambda_z > 0:
-            loss = loss + lambda_z * torch.mean(delta_z ** 2)
-        if lambda_a > 0:
-            loss = loss + lambda_a * torch.mean(delta_a ** 2)
-        
-        loss.backward()
-        optimizer.step()
-        
-        total_loss += loss.item()
-        n_batches += 1
+    for batch in dataloader:
+        if len(batch) == 3:
+            z, a, z_next = batch
+            z = z.to(device)
+            a = a.to(device)
+            z_next = z_next.to(device)
+            
+            # Encode images if using encoder
+            if hasattr(model, 'encoder') and model.encoder is not None:
+                with torch.no_grad():
+                    if z.dim() == 5: 
+                        B, T, C, H, W = z.shape
+                        z = model.encode(z.view(-1, C, H, W)).view(B, T, -1)
+                        z_next = model.encode(z_next.view(-1, C, H, W)).view(B, T, -1)
+                    else:
+                        z = model.encode(z)
+                        z_next = model.encode(z_next)
+            
+            # Initialize perturbations uniformly in [-eps, eps]
+            delta_z = torch.empty_like(z).uniform_(-eps_z, eps_z)
+            delta_a = torch.empty_like(a).uniform_(-eps_a, eps_a)
+            
+            delta_z.requires_grad_(True)
+            delta_a.requires_grad_(True)
+            
+            # Compute loss on perturbed inputs
+            z_pert = z + delta_z
+            a_pert = a + delta_a
+            z_next_pred = model(z_pert, a_pert)
+            loss_pert = criterion(z_next_pred, z_next)
+            
+            # Compute gradients w.r.t. perturbations
+            grad_z = torch.autograd.grad(loss_pert, delta_z, create_graph=True)[0]
+            grad_a = torch.autograd.grad(loss_pert, delta_a, create_graph=True)[0]
+            
+            # Update perturbations: FGSM-style (single step with sign)
+            delta_z = delta_z + alpha * torch.sign(grad_z)
+            delta_a = delta_a + alpha * torch.sign(grad_a)
+            
+            # Clip perturbations to bounds
+            delta_z = torch.clamp(delta_z, -eps_z, eps_z)
+            delta_a = torch.clamp(delta_a, -eps_a, eps_a)
+            
+            # Detach for final forward pass (don't backprop through perturbation update)
+            delta_z = delta_z.detach()
+            delta_a = delta_a.detach()
+            
+            # Final forward pass on perturbed inputs
+            optimizer.zero_grad()
+            z_pert = z + delta_z
+            a_pert = a + delta_a
+            z_next_pred = model(z_pert, a_pert)
+            
+            # Loss with scaling factors
+            loss = criterion(z_next_pred, z_next)
+            if lambda_z > 0:
+                loss = loss + lambda_z * torch.mean(delta_z ** 2)
+            if lambda_a > 0:
+                loss = loss + lambda_a * torch.mean(delta_a ** 2)
+            
+            loss.backward()
+            
+            if isinstance(model, TransformerWorldModel):
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                
+            optimizer.step()
+            
+            total_loss += loss.item()
+            n_batches += 1
     
-    return total_loss / n_batches
+    return total_loss / n_batches if n_batches > 0 else 0.0
 
 
 def validate(model, dataloader, criterion, device):
@@ -116,18 +121,30 @@ def validate(model, dataloader, criterion, device):
     n_batches = 0
     
     with torch.no_grad():
-        for z, a, z_next in dataloader:
-            z = z.to(device)
-            a = a.to(device)
-            z_next = z_next.to(device)
-            
-            z_next_pred = model(z, a)
-            loss = criterion(z_next_pred, z_next)
-            
-            total_loss += loss.item()
-            n_batches += 1
+        for batch in dataloader:
+            if len(batch) == 3:
+                z, a, z_next = batch
+                z = z.to(device)
+                a = a.to(device)
+                z_next = z_next.to(device)
+                
+                # Encode images if using encoder
+                if hasattr(model, 'encoder') and model.encoder is not None:
+                    if z.dim() == 5: 
+                        B, T, C, H, W = z.shape
+                        z = model.encode(z.view(-1, C, H, W)).view(B, T, -1)
+                        z_next = model.encode(z_next.view(-1, C, H, W)).view(B, T, -1)
+                    else:
+                        z = model.encode(z)
+                        z_next = model.encode(z_next)
+                
+                z_next_pred = model(z, a)
+                loss = criterion(z_next_pred, z_next)
+                
+                total_loss += loss.item()
+                n_batches += 1
     
-    return total_loss / n_batches
+    return total_loss / n_batches if n_batches > 0 else 0.0
 
 
 def main():
@@ -145,36 +162,72 @@ def main():
     parser.add_argument("--val_split", type=float, default=0.1, help="Validation split")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--adaptive_eps", action="store_true", help="Adaptive perturbation radii from first batch")
+    parser.add_argument("--use_images", action="store_true", help="Use images instead of states")
+    parser.add_argument("--image_model_size", type=str, default="small", help="DINOv2 model size")
+    parser.add_argument("--model_type", type=str, default="mlp", choices=["mlp", "transformer"], help="Model type")
+    parser.add_argument("--context_length", type=int, default=16, help="Context length for transformer")
     
     args = parser.parse_args()
     
     # Set random seed
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
+    set_seed(args.seed)
     
-    # Device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Device (supports CUDA, MPS for Apple Silicon, or CPU)
+    device = get_device()
     print(f"Using device: {device}")
+    
+    # Initialize encoder if using images
+    encoder = None
+    if args.use_images:
+        print(f"Initializing DINOv2 {args.image_model_size} encoder...")
+        encoder = DINOv2Encoder(model_size=args.image_model_size, device=str(device))
+        print(f"Encoder output dim: {encoder.output_dim}")
     
     # Load baseline model
     print(f"Loading baseline model from {args.checkpoint}...")
     checkpoint = torch.load(args.checkpoint, map_location=device)
     
-    model = WorldModel(
-        state_dim=checkpoint['state_dim'],
-        action_dim=checkpoint['action_dim'],
-        hidden_dim=checkpoint['hidden_dim'],
-        num_layers=checkpoint['num_layers'],
-        use_residual=checkpoint['use_residual'],
-    ).to(device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    print("Loaded baseline model")
+    state_dim = checkpoint['state_dim']
+    if args.use_images and encoder is not None:
+        state_dim = encoder.output_dim
+        
+    if args.model_type == "transformer":
+        model = TransformerWorldModel(
+            state_dim=state_dim,
+            action_dim=checkpoint['action_dim'],
+            embed_dim=checkpoint['hidden_dim'],
+            num_layers=checkpoint['num_layers'],
+            num_heads=4,
+            encoder=encoder,
+            max_len=args.context_length + 10 # Buffer
+        ).to(device)
+    else:
+        model = WorldModel(
+            state_dim=state_dim,
+            action_dim=checkpoint['action_dim'],
+            hidden_dim=checkpoint['hidden_dim'],
+            num_layers=checkpoint['num_layers'],
+            use_residual=checkpoint['use_residual'],
+            encoder=encoder,
+        ).to(device)
+    
+    try:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print("Loaded baseline model")
+    except RuntimeError:
+        print("Warning: Could not load state dict. Starting from scratch/random init.")
     
     # Load dataset
     print(f"Loading dataset from {args.data_path}...")
-    full_dataset = ExpertDataset(args.data_path)
-    
+    try:
+        if args.model_type == "transformer":
+            full_dataset = SequenceDataset(args.data_path, context_length=args.context_length, use_images=args.use_images)
+        else:
+            full_dataset = ExpertDataset(args.data_path, use_images=args.use_images)
+    except ValueError as e:
+        print(f"Error loading dataset: {e}")
+        return
+        
     # Split train/val
     n_total = len(full_dataset)
     n_val = int(n_total * args.val_split)
@@ -189,13 +242,26 @@ def main():
     # Adaptive perturbation radii
     if args.adaptive_eps:
         # Compute std from first batch
-        z_sample, a_sample, _ = next(iter(train_loader))
+        batch = next(iter(train_loader))
+        z_sample, a_sample, _ = batch
+        
+        if args.use_images:
+            z_sample = z_sample.to(device)
+            with torch.no_grad():
+                if z_sample.dim() == 5: 
+                    B, T, C, H, W = z_sample.shape
+                    z_sample = model.encode(z_sample.view(-1, C, H, W)).view(B, T, -1)
+                else:
+                    z_sample = model.encode(z_sample)
+        
         eps_z = float(0.1 * z_sample.std().item())
         eps_a = float(0.1 * a_sample.std().item())
         print(f"Adaptive eps_z={eps_z:.4f}, eps_a={eps_a:.4f}")
     else:
         eps_z = args.eps_z
         eps_a = args.eps_a
+
+
     
     # Loss and optimizer
     criterion = nn.MSELoss()

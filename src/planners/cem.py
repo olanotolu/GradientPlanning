@@ -41,6 +41,13 @@ def plan(
     """
     device = next(world_model.parameters()).device
     
+    # Auto-encode images if model has encoder
+    if hasattr(world_model, 'encoder') and world_model.encoder is not None:
+        if z0.dim() >= 3:
+            with torch.no_grad():
+                z0 = world_model.encode(z0.to(device))
+                z_goal = world_model.encode(z_goal.to(device))
+    
     # Ensure tensors are on correct device
     if z0.dim() == 1:
         z0 = z0.unsqueeze(0).to(device)

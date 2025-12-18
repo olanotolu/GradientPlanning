@@ -20,6 +20,15 @@ TRAIN_CONFIG = {
     'seed': 42,
 }
 
+# Transformer Model
+TRANSFORMER_CONFIG = {
+    'embed_dim': 128,
+    'num_layers': 4,
+    'num_heads': 4,
+    'dropout': 0.1,
+    'context_length': 16,
+}
+
 # Adversarial training
 ADVERSARIAL_CONFIG = {
     'eps_z': 0.1,
@@ -67,4 +76,3 @@ ENV_CONFIG = {
     'bounds': (-2.0, 2.0, -2.0, 2.0),
     'use_velocity': False,
 }
-

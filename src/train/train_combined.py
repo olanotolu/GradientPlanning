@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.models.world_model import WorldModel
 from src.data import ExpertDataset
 from src.train.train_adversarial import train_epoch_adversarial, validate
+from src.utils.device import get_device, set_seed
 
 
 def main():
@@ -38,12 +39,10 @@ def main():
     args = parser.parse_args()
     
     # Set random seed
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
+    set_seed(args.seed)
     
-    # Device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Device (supports CUDA, MPS for Apple Silicon, or CPU)
+    device = get_device()
     print(f"Using device: {device}")
     
     # Load online finetuned model

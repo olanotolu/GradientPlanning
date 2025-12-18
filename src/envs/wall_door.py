@@ -182,3 +182,30 @@ class WallDoorEnv:
         y = np.random.uniform(y_min, y_max)
         return np.array([x, y], dtype=np.float32)
 
+    def render(self, state: np.ndarray, goal: Optional[np.ndarray] = None, resolution: int = 224) -> np.ndarray:
+        """
+        Render environment state to RGB image.
+        
+        Args:
+            state: Current state [x, y] or [x, y, vx, vy]
+            goal: Goal state (optional)
+            resolution: Image resolution (width=height)
+            
+        Returns:
+            rgb_array: (resolution, resolution, 3) uint8 array
+        """
+        # Lazy import to avoid circular dependency
+        from src.utils.rendering import Renderer
+        
+        if not hasattr(self, 'renderer'):
+            self.renderer = Renderer(resolution=resolution, bounds=self.bounds)
+            
+        return self.renderer.render_wall_door(
+            agent_pos=state[:2],
+            wall_x=self.wall_x,
+            door_y_min=self.door_y_min,
+            door_y_max=self.door_y_max,
+            goal_pos=goal[:2] if goal is not None else None
+        )
+
+

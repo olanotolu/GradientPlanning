@@ -20,12 +20,30 @@ class WorldModel(nn.Module):
         hidden_dim: int = 128,
         num_layers: int = 3,
         use_residual: bool = True,
+        latent_dim: Optional[int] = None,
+        encoder: Optional[nn.Module] = None,
     ):
-        """use_residual=True means predict delta: z_next = z + delta"""
+        """
+        use_residual=True means predict delta: z_next = z + delta
+        
+        Args:
+            state_dim: Dimension of state (or latent if using images)
+            action_dim: Dimension of action
+            hidden_dim: Hidden layer dimension
+            num_layers: Number of hidden layers
+            use_residual: Whether to predict residual
+            latent_dim: Optional override for state_dim (for clarity when using latents)
+            encoder: Optional visual encoder
+        """
         super().__init__()
+        # If latent_dim provided, use it as state_dim
+        if latent_dim is not None:
+            state_dim = latent_dim
+            
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.use_residual = use_residual
+        self.encoder = encoder
         
         input_dim = state_dim + action_dim
         layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]
@@ -35,6 +53,13 @@ class WorldModel(nn.Module):
         
         layers.append(nn.Linear(hidden_dim, state_dim))
         self.net = nn.Sequential(*layers)
+    
+    def encode(self, obs: torch.Tensor) -> torch.Tensor:
+        """Encode observation to latent state."""
+        if self.encoder is not None:
+            return self.encoder(obs)
+        return obs  # If no encoder, assume obs is already state/latent
+
     
     def forward(self, z: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
         """Predict next state from current state and action."""
