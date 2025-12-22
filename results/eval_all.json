@@ -1,37 +1,37 @@
 {
-  "n_episodes": 100,
+  "n_episodes": 50,
   "horizon": 200,
   "seed": 42,
   "methods": {
     "Baseline GBP": {
-      "success_rate": 0.09,
-      "avg_distance": 1.603926288485527,
-      "avg_wm_error": 0.5857271018408632,
-      "avg_time": 8.645833187103271
+      "success_rate": 0.22,
+      "avg_distance": 1.3070960974693298,
+      "avg_wm_error": 0.0,
+      "avg_time": 5.799121165275574
     },
     "Online GBP": {
-      "success_rate": 0.1,
-      "avg_distance": 1.3945911568403244,
-      "avg_wm_error": 0.2824639667296824,
-      "avg_time": 9.950991897583007
+      "success_rate": 0.38,
+      "avg_distance": 1.1247250097990036,
+      "avg_wm_error": 0.0,
+      "avg_time": 5.721972851753235
     },
     "Adversarial GBP": {
       "success_rate": 0.0,
-      "avg_distance": 3.1705062437057494,
-      "avg_wm_error": 1.4332179014480184,
-      "avg_time": 10.97592345237732
+      "avg_distance": 3.2130874156951905,
+      "avg_wm_error": 0.0,
+      "avg_time": 5.465216150283814
     },
     "Combined GBP": {
       "success_rate": 0.0,
-      "avg_distance": 2.120271487236023,
-      "avg_wm_error": 0.7469942876388296,
-      "avg_time": 10.160169055461884
+      "avg_distance": 2.1552915740013123,
+      "avg_wm_error": 0.0,
+      "avg_time": 5.778030548095703
     },
     "CEM": {
-      "success_rate": 0.32,
-      "avg_distance": 1.1935252076387406,
-      "avg_wm_error": 0.5625779003321276,
-      "avg_time": 23.209171600341797
+      "success_rate": 0.48,
+      "avg_distance": 0.9823065501451492,
+      "avg_wm_error": 0.0,
+      "avg_time": 13.243586869239808
     }
   }
 }

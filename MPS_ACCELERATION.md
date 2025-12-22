@@ -74,3 +74,11 @@ You should see:
 Your training should now be **much faster**. The online finetuning that was taking 12 hours should complete in 1-2 hours on your M4 Mac!
 
 
+
+
+
+
+
+
+
+
